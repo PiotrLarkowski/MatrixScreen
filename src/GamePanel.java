@@ -1,15 +1,14 @@
 import javax.swing.*;
 import java.awt.*;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 public class GamePanel extends JPanel implements Runnable {
     static final int WIDTH = Toolkit.getDefaultToolkit().getScreenSize().width;
     static final int HEIGHT = Toolkit.getDefaultToolkit().getScreenSize().height;
-    long lastTimeAddLetter = System.nanoTime();
     boolean escPressed = false;
     boolean timeCheck = false;
     Thread gameThread;
@@ -17,23 +16,38 @@ public class GamePanel extends JPanel implements Runnable {
     static Random random = new Random();
     static int randomInt;
     static int randomCharacter;
+    static ArrayList<ArrayList<SimpleLetter>> listOfActiveChains = new ArrayList<>();
     static ArrayList<SimpleLetter> characters = new ArrayList<>();
     long timeNow = 0;
     long timePass = LocalDateTime.now().getSecond();
-    long newLetterTimeNow = LocalDateTime.now().getSecond();
+    long startTime = System.nanoTime();
+    boolean newLetter = true;
     KeyHandler keyHandler = new KeyHandler();
+    int activeLevelOfApplication = 0;
 
     public GamePanel() {
 
-        this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
-        this.setBackground(Color.black);
-        this.setLayout(null);
-        this.setFocusable(true);
+        initializeListOfActiveChains();
+        createMainWindow();
 
         addKeyListener(keyHandler);
 
         gameThread = new Thread(this);
         gameThread.start();
+    }
+
+    private void createMainWindow() {
+        this.setPreferredSize(new Dimension(WIDTH, HEIGHT));
+        this.setBackground(Color.black);
+        this.setLayout(null);
+        this.setFocusable(true);
+    }
+
+    private static void initializeListOfActiveChains() {
+        for (int i = 0; i < WIDTH; i++) {
+            SimpleLetter simpleLetter = new SimpleLetter(false, 0, 0, '0');
+            listOfActiveChains.add(i, new ArrayList<>(List.of(simpleLetter)));
+        }
     }
 
     public void paintComponent(Graphics g) {
@@ -57,11 +71,14 @@ public class GamePanel extends JPanel implements Runnable {
                 System.exit(0);
             }
         } else {
-            for (int i = 0; i <characters.size(); i++) {
-                if(characters.get(i)!=null){
-                    g2.setColor(Color.GREEN);
-                    g2.setFont(new Font("Arial", Font.PLAIN, 13));
-                    g2.drawString(""+characters.get(i).letter, characters.get(i).xCoordinate, characters.get(i).yCoordinate);
+            for (int i = 0; i < listOfActiveChains.size(); i++) {
+                for (int j = 0; j <listOfActiveChains.get(i).size(); j++) {
+                    if (listOfActiveChains.get(i).get(j).active) {
+                        SimpleLetter simpleLetter = listOfActiveChains.get(i).get(j);
+                        g2.setColor(Color.GREEN);
+                        g2.setFont(new Font("Arial", Font.PLAIN, 13));
+                        g2.drawString("" + simpleLetter.letter, simpleLetter.xCoordinate, simpleLetter.yCoordinate);
+                    }
                 }
             }
         }
@@ -72,18 +89,20 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public void update() {
-        long currentTime = System.nanoTime();
-        long interval = (currentTime-lastTimeAddLetter);
-        if(interval>1000000000){
-            for (int i = 0; i < WIDTH; i++) {
-                Optional<SimpleLetter> letter = Optional.of(characters.get(i));
-                if(letter.isEmpty()){
-                    randomInt = random.nextInt(WIDTH);
-                    randomCharacter = random.nextInt(255);
-                    characters.add(i,new SimpleLetter(randomInt,13,(char)randomCharacter));
-                }
+        if (newLetter) {
+            startTime = System.nanoTime();
+            newLetter = false;
+        }
+        long stopTime = System.nanoTime();
+        long interval = (stopTime - startTime);
+        double second = (double) interval / 1000000000.0;
+        if (second > 1) {
+            if (activeLevelOfApplication == 0) {
+                randomInt = random.nextInt(WIDTH);
+                randomCharacter = random.nextInt(255);
+                listOfActiveChains.add(randomInt, new ArrayList<>(List.of(new SimpleLetter(true, randomInt, 15, (char) randomCharacter))));
             }
-            lastTimeAddLetter = System.nanoTime();
+            newLetter = true;
         }
         if (KeyHandler.escPressed) {
             escPressed = true;
